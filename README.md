@@ -20,8 +20,9 @@ The architecture includes two sub-models: HighFold3-Linear for linear peptides a
 Refer to the conda version of AlphaFold3 installation, and replace the feature files by highfold3/model.
 
 **Usage :**
+run_alphafold.py
 
-db_dir=af3_db_path
+--db_dir=af3_db_path
 
 --model_dir=models_path
 
