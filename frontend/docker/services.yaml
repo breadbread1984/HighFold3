@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  frontend:
+    image: alphafold3:latest
+    working_dir: /root/frontend
+    container_name: alphafold3_frontend
+    ports:
+      - 8083:8083
+    volumes:
+      - ../../pretrained:/root/models
+      - /srv/shared/public_databases:/root/public_databases
+      - ./af_input:/root/af_input
+      - ./af_output:/root/af_output
+      - ../:/root/frontend
+      - ../../:/app/highfold
+    command: uv run python3 main.py --service_port 8083 --num_gpus 4
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: always

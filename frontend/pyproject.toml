@@ -1,0 +1,18 @@
+[project]
+name = "alphafold3-frontend"
+version = "0.1.0"
+description = "A frontend to alphafold3"
+authors = [
+  {name = "breadbread1984", email = "yxie.lhi@gmail.com"}
+]
+requires-python = ">=3.12"
+
+dependencies = [                    # 运行时主依赖组
+    "gradio",         # Gradio UI
+    "absl-py",         # Google Abseil (AF3核心)
+    "pandas",          # 数据处理
+    "fastapi",       # API服务
+    "bio"         # 生物信息学 (bio)
+]
+
+[tool.uv]
