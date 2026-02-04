@@ -52,7 +52,7 @@ class AlphaFold3Manager(object):
               self.status[gpu_id] = 'finished'
               self.processes[gpu_id] = None
       #time.sleep(1)
-  def run_alphafold3(self, gpu_id, input_file, seed = 1):
+  def run_alphafold3(self, gpu_id, input_file, head_to_tail, seed = 1):
     if gpu_id not in self.processes:
       return False, f"invalid GPU ID: {gpu_id}"
     if self.status[gpu_id] == 'running':
@@ -63,6 +63,7 @@ class AlphaFold3Manager(object):
       with self.lock:
         self.processes[gpu_id] = af3.predict(
           input_file,
+          head_to_tail = head_to_tail,
           seeds = [seed],
           gpu_id = gpu_id
         )
@@ -91,7 +92,8 @@ def create_interface(manager):
           with gr.Row(equal_height = True):
             input_file = gr.File(label = 'input file', file_types = ['.fasta', '.cif'])
           with gr.Row():
-            seed = gr.Number(label = 'seed', value = 1, minimum = 1, precision = 0)
+            seed = gr.Number(label = 'seed', value = 1, minimum = 1, precision = 0, scale = 1)
+            head_to_tail = gr.Checkbox(label = 'head to tail', value = True, scale = 1)
           with gr.Row():
             gr.Markdown('### Device Selector')
           with gr.Row():
@@ -118,12 +120,13 @@ def create_interface(manager):
             view_btn = gr.Button(value = 'visualize')
           results = gr.Dataframe(headers = ['job name', 'path'], datatype = ['str', 'str'], interactive = False)
     # 2) callbacks
-    def run_prediction(input_file, seed, gpu_id):
+    def run_prediction(input_file, seed, head_to_tail, gpu_id):
       if input_file is None:
         raise gr.Error("error: please upload file you want to prediction")
       success, message = manager.run_alphafold3(
         gpu_id = int(gpu_id),
         input_file = input_file,
+        head_to_tail = head_to_tail,
         seed = seed
       )
       if success == False:
@@ -191,7 +194,7 @@ def create_interface(manager):
     for device, widgets in tabs.items():
       widgets['submit'].click(
         partial(run_prediction, gpu_id = device),
-        inputs = [input_file, seed],
+        inputs = [input_file, seed, head_to_tail],
         outputs = [widgets['status'], widgets['logs']]
       )
     view_tab.select(

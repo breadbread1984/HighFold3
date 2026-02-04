@@ -14,7 +14,7 @@ class AF3(object):
     self.input_dir = input_dir
     self.output_dir = output_dir
     self.public_databases = abspath(public_databases)
-  def predict(self, input_file, seeds = [1], gpu_id = 0):
+  def predict(self, input_file, head_to_tail = True, seeds = [1], gpu_id = 0):
     assert exists(self.input_dir) and isdir(self.input_dir)
     assert exists(self.output_dir) and isdir(self.output_dir)
     stem, ext = splitext(input_file)
@@ -44,7 +44,8 @@ class AF3(object):
           f"--json_path={join(self.input_dir, basename(f.name))}",
           f"--output_dir={join(self.output_dir, str(gpu_id))}",
           f"--model_dir={self.model_dir}",
-          f"--db_dir={self.public_databases}"
+          f"--db_dir={self.public_databases}",
+          f"--head_to_tail={head_to_tail}",
         ],
         env = env,
         cwd = "/app/alphafold",
