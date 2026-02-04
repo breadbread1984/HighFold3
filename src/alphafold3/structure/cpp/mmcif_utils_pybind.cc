@@ -355,12 +355,12 @@ inline MmcifLayout ReadMmcifLayout(const CifDict& mmcif,
   throw py::value_error(std::string(mmcif_layout.status().message()));
 }
 
-py::tuple MmcifFilter(         //
-    const CifDict& mmcif,      //
-    bool include_nucleotides,  //
-    bool include_ligands,      //
-    bool include_water,        //
-    bool include_other,        //
+std::pair<py::object, MmcifLayout> MmcifFilter(  //
+    const CifDict& mmcif,                        //
+    bool include_nucleotides,                    //
+    bool include_ligands,                        //
+    bool include_water,                          //
+    bool include_other,                          //
     absl::string_view model_id) {
   if (_import_array() < 0) {
     throw py::import_error("Failed to import NumPy.");
@@ -368,15 +368,15 @@ py::tuple MmcifFilter(         //
   auto layout = ReadMmcifLayout(mmcif, model_id);
   std::unique_ptr<std::vector<std::uint64_t>> keep_indices;
   size_t new_num_atoms;
-  absl::flat_hash_set<absl::string_view> keep_chain_ids;
 
   {
     py::gil_scoped_release release;
 
     AtomSiteLoop atom_site(mmcif);
 
-    keep_chain_ids = SelectChains(mmcif, include_nucleotides, include_ligands,
-                                  include_water, include_other);
+    auto keep_chain_ids =
+        SelectChains(mmcif, include_nucleotides, include_ligands, include_water,
+                     include_other);
 
     std::vector<std::size_t> chain_indices;
     chain_indices.reserve(keep_chain_ids.size());
@@ -422,7 +422,7 @@ py::tuple MmcifFilter(         //
       });
   PyArray_SetBaseObject(reinterpret_cast<PyArrayObject*>(arr), capsule);
 
-  return py::make_tuple(py::reinterpret_steal<py::object>(arr), keep_chain_ids,
+  return std::make_pair(py::reinterpret_steal<py::object>(arr),
                         std::move(layout));
 }
 

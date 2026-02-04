@@ -116,7 +116,7 @@ absl::StatusOr<std::vector<absl::string_view>> TokenizeInternal(
   tokens.reserve(lines.size() * 21);
   int line_num = 0;
   while (line_num < lines.size()) {
-    auto line = absl::StripSuffix(lines[line_num], "\r");
+    auto line = lines[line_num];
     line_num++;
 
     if (line.empty() || line[0] == '#') {
@@ -134,9 +134,6 @@ absl::StatusOr<std::vector<absl::string_view>> TokenizeInternal(
         line_num++;
         if (!multiline.empty() && multiline[0] == ';') {
           break;
-        } else if (line_num == lines.size()) {
-          return absl::InvalidArgumentError(
-              "Last multiline token is not terminated by a semicolon.");
         }
         multiline_tokens.push_back(multiline);
       }
@@ -153,39 +150,17 @@ absl::StatusOr<std::vector<absl::string_view>> TokenizeInternal(
   return tokens;
 }
 
-// Returns whether the token doesn't need any quoting. This is true if the token
-// isn't empty and contains only safe characters [A-Za-z0-9.?-].
-bool IsTrivialToken(const absl::string_view value) {
-  if (value.empty()) {
-    return false;
-  }
-
-  return std::all_of(value.begin(), value.end(), [](char c) {
-    return absl::ascii_isalnum(c) || c == '.' || c == '?' || c == '-';
-  });
-}
-
-// Returns whether the token needs to be a multiline token. This happens if it
-// has a newline or both single and double quotes.
-bool IsMultiLineToken(const absl::string_view value) {
-  bool has_single_quotes = false;
-  bool has_double_quotes = false;
-  for (const char c : value) {
-    if (c == '\n') {
-      return true;
-    } else if (c == '\'') {
-      has_single_quotes = true;
-    } else if (c == '"') {
-      has_double_quotes = true;
-    }
-  }
-  return has_single_quotes && has_double_quotes;
-}
-
 absl::string_view GetEscapeQuote(const absl::string_view value) {
   // Empty values should not happen, but if so, they should be quoted.
   if (value.empty()) {
     return "\"";
+  }
+
+  // Shortcut for the most common cases where no quoting needed.
+  if (std::all_of(value.begin(), value.end(), [](char c) {
+        return absl::ascii_isalnum(c) || c == '.' || c == '?' || c == '-';
+      })) {
+    return "";
   }
 
   // The value must not start with one of these CIF keywords.
@@ -204,26 +179,13 @@ absl::string_view GetEscapeQuote(const absl::string_view value) {
     return "\"";
   }
 
-  // No quotes or whitespace allowed inside. Rare case when both double and
-  // single quotes are present is handled by IsMultiLineToken.
-  bool use_double_quote = true;
-  bool use_single_quote = true;
-  bool needs_quote = false;
+  // No quotes or whitespace allowed inside.
   for (const char c : value) {
-    if (c == ' ' || c == '\t') {
-      needs_quote = true;
-    } else if (c == '"') {
-      needs_quote = true;
-      use_double_quote = false;
-    } else if (c == '\'') {
-      needs_quote = true;
-      use_single_quote = false;
+    if (c == '"') {
+      return "'";
+    } else if (c == '\'' || c == ' ' || c == '\t') {
+      return "\"";
     }
-  }
-  if (needs_quote && use_double_quote) {
-    return "\"";
-  } else if (needs_quote && use_single_quote) {
-    return "'";
   }
   return "";
 }
@@ -292,11 +254,7 @@ class Column {
     int max_value_length = 0;
     for (size_t i = 0; i < values->size(); ++i) {
       absl::string_view value = (*values)[i];
-      if (IsTrivialToken(value)) {
-        // Shortcut for the most common cases where no quoting/multiline needed.
-        max_value_length = std::max<int>(max_value_length, value.size());
-        continue;
-      } else if (IsMultiLineToken(value)) {
+      if (absl::StrContains(value, '\n')) {
         values_with_newlines_.insert(i);
       } else {
         absl::string_view quote = GetEscapeQuote(value);
@@ -343,16 +301,6 @@ struct GroupedKeys {
   int value_size;
 };
 
-absl::Status CheckLoopColumnSizes(int num_loop_keys, int num_loop_values) {
-  if ((num_loop_keys > 0) && (num_loop_values % num_loop_keys != 0)) {
-    return absl::InvalidArgumentError(absl::StrFormat(
-        "The number of values (%d) in a loop is not a multiple of the "
-        "number of the loop's columns (%d)",
-        num_loop_values, num_loop_keys));
-  }
-  return absl::OkStatus();
-}
-
 }  // namespace
 
 absl::StatusOr<CifDict> CifDict::FromString(absl::string_view cif_string) {
@@ -377,10 +325,6 @@ absl::StatusOr<CifDict> CifDict::FromString(absl::string_view cif_string) {
     return absl::InvalidArgumentError(
         "The CIF file does not start with the data_ field.");
   }
-  if (first_token.empty()) {
-    return absl::InvalidArgumentError(
-        "The CIF file does not contain a data block name.");
-  }
   cif["data_"].emplace_back(first_token);
 
   // Counters for CIF loop_ regions.
@@ -397,12 +341,7 @@ absl::StatusOr<CifDict> CifDict::FromString(absl::string_view cif_string) {
        ++token_itr) {
     auto token = *token_itr;
     if (absl::EqualsIgnoreCase(token, "loop_")) {
-      // A new loop started, check the previous loop and get rid of its data.
-      absl::Status loop_status =
-          CheckLoopColumnSizes(num_loop_keys, loop_token_index);
-      if (!loop_status.ok()) {
-        return loop_status;
-      }
+      // A new loop started, get rid of old loop's data.
       loop_flag = true;
       loop_column_values.clear();
       loop_token_index = 0;
@@ -420,12 +359,7 @@ absl::StatusOr<CifDict> CifDict::FromString(absl::string_view cif_string) {
           loop_flag = false;
         } else {
           // We are in the keys (column names) section of the loop.
-          auto [it, inserted] = cif.try_emplace(token);
-          if (!inserted) {
-            return absl::InvalidArgumentError(
-                absl::StrCat("Duplicate loop key: '", token, "'"));
-          }
-          auto& columns = it->second;
+          auto& columns = cif[token];
           columns.clear();
 
           // Heuristic: _atom_site is typically the largest table in an mmCIF
@@ -455,24 +389,10 @@ absl::StatusOr<CifDict> CifDict::FromString(absl::string_view cif_string) {
     }
     if (key.empty()) {
       key = token;
-      if (!absl::StartsWith(key, "_")) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("Key '", key, "' does not start with an underscore."));
-      }
     } else {
-      auto [it, inserted] = cif.try_emplace(key);
-      if (!inserted) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("Duplicate key: '", key, "'"));
-      }
-      (it->second).emplace_back(token);
+      cif[key].emplace_back(token);
       key = "";
     }
-  }
-  absl::Status loop_status =
-      CheckLoopColumnSizes(num_loop_keys, loop_token_index);
-  if (!loop_status.ok()) {
-    return loop_status;
   }
   return CifDict(std::move(cif));
 }
