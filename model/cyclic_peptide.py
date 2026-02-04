@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from typing import List
-import numpy as np
+import jax.numpy as np
 
 def calc_cyclic_matrix_af3(residue_index, head_to_tail = False, list_cid_ss: List = [], token_wise = False, signal_bug_fix = True):
   if head_to_tail:
