@@ -13,7 +13,6 @@ services:
       - ./af_input:/root/af_input
       - ./af_output:/root/af_output
       - ../:/root/frontend
-      - ../../:/app/alphafold
     command: uv run python3 main.py --service_port 8083 --num_gpus 4
     deploy:
       resources:
