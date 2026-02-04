@@ -35,6 +35,8 @@ class AF3(object):
       })
       proc = subprocess.Popen(
         [
+          "uv",
+          "run",
           "python",
           "run_alphafold.py",
           f"--json_path={join(self.input_dir, basename(f.name))}",
