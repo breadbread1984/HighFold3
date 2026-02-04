@@ -45,7 +45,7 @@ class AF3(object):
           f"--db_dir={self.public_databases}"
         ],
         env = env,
-        cwd = "/app/highfold",
+        cwd = "/app/alphafold",
         stdout = subprocess.PIPE,
         stderr = subprocess.STDOUT,
         text = True,
