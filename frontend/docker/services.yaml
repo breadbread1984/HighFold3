@@ -2,7 +2,7 @@ version: '3'
 
 services:
   frontend:
-    image: alphafold3:latest
+    image: highfold3:latest
     working_dir: /root/frontend
     container_name: alphafold3_frontend
     ports:
