@@ -36,6 +36,8 @@ class AF3(object):
       proc = subprocess.Popen(
         [
           "uv",
+          "--directory",
+          "/app/alphafold",
           "run",
           "python",
           "run_alphafold.py",
