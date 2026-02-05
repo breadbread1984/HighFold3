@@ -80,7 +80,7 @@ class AlphaFold3Manager(object):
     return "no log"
 
 def create_interface(manager):
-  with gr.Blocks(title = "AlphaFold3 manager") as interface:
+  with gr.Blocks(title = "HighFold3 manager") as interface:
     # 1) interface
     with gr.Row():
       gr.Markdown("# AlphaFold3 manager tools")
